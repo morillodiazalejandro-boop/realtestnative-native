@@ -1,0 +1,43 @@
+
+workflows:
+  appthunder-build:
+    name: AppThunder Native Build
+    instance_type: mac_mini_m1
+    max_build_duration: 60
+    environment:
+      java: 21
+      node: latest
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Install dependencies
+        script: npm install
+      - name: 🎨 Generate Native Assets
+        script: |
+          echo "Installing asset tool..."
+          npm install @capacitor/assets --save-dev
+          echo "Generating icons and splash screens..."
+          npx capacitor-assets generate --iconBackgroundColor '#ffffff' --splashBackgroundColor '#ffffff'
+      - name: ⚡ AppThunder Initialization
+        script: |
+          # 1. Native Ordner generieren
+          echo "Initializing AppThunder native environments..."
+          npx cap add android || true
+          npx cap add ios || true
+          npx cap sync
+          
+      - name: Build Android (.aab)
+        script: cd android && ./gradlew bundleRelease
+        
+      - name: Build iOS (.ipa)
+        script: |
+          # 2. Smart Build: Nutzt Codemagic-Tools für automatische IPA-Erstellung
+          # Findet automatisch heraus, ob Workspace oder Project genutzt werden muss
+          if [ -d "ios/App/App.xcworkspace" ]; then
+            xcode-project build-ipa --workspace "ios/App/App.xcworkspace" --scheme "App"
+          else
+            xcode-project build-ipa --project "ios/App/App.xcodeproj" --scheme "App"
+          fi
+    artifacts:
+      - android/app/build/outputs/bundle/release/*.aab
+      - build/ios/ipa/*.ipa
